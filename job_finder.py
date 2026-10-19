@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 # CAREERPILOT AI — LIVE JOB FINDER
 
-LOCATIONS = ["Delhi", "Gurugram", "Gurgaon", "Noida"]
+LOCATIONS = ["Delhi", "Gurugram", "Gurgaon", "Noida", "Mumbai", "Bangalore", "Pune"]
 
 KEYWORDS = [
     "financial analyst",
@@ -24,19 +24,7 @@ MIN_SALARY_LPA = 4.0
 
 # Add verified Greenhouse board identifiers here.
 # These are identifiers, not company names.
-GREENHOUSE_BOARDS = [
-    "stripe",
-    "razorpay",
-    "phonepe",
-    "kpmg",
-    "American express",
-    "paytm",
-    "pwc",
-    "accenture",
-    "cognizant",
-    "marsh",
-    "ey",
-]
+GREENHOUSE_BOARDS = []
 
 OUTPUT_FILE = "jobs_found.csv"
 
