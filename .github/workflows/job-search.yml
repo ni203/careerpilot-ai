@@ -1,0 +1,35 @@
+name: CareerPilot Job Search
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 3 * * 1-5"
+
+permissions:
+  contents: write
+
+jobs:
+  search-jobs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download project
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Search for jobs
+        run: python job_finder.py
+
+      - name: Save job results
+        uses: actions/upload-artifact@v4
+        with:
+          name: careerpilot-job-results
+          path: jobs_found.csv
+          if-no-files-found: ignore
