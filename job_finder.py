@@ -1,11 +1,10 @@
 import csv
 import html
+import re
 import requests
 from datetime import datetime, timezone
 
-# CAREERPILOT AI — LIVE JOB FINDER
-
-LOCATIONS = ["Delhi", "Gurugram", "Gurgaon", "Noida", "Mumbai", "Bangalore", "Pune"]
+# CAREERPILOT AI — JOB FINDER
 
 KEYWORDS = [
     "financial analyst",
@@ -18,95 +17,73 @@ KEYWORDS = [
     "financial planning",
     "business finance",
     "finance associate",
+    "accountant",
+    "financial reporting",
 ]
 
 MIN_SALARY_LPA = 4.0
+PREFERRED_SALARY_LPA = 6.0
 
-# Add verified Greenhouse board identifiers here.
-# These are identifiers, not company names.
-GREENHOUSE_BOARDS = []
-
+REMOTIVE_API = "https://remotive.com/api/remote-jobs"
 OUTPUT_FILE = "jobs_found.csv"
 
 
-def fetch_greenhouse_jobs(board_token):
-    """Retrieve publicly listed jobs from one Greenhouse board."""
-
-    endpoint = (
-        "https://boards-api.greenhouse.io/v1/boards/"
-        f"{board_token}/jobs"
-    )
+def fetch_remote_jobs():
+    """Retrieve published remote jobs from Remotive."""
 
     try:
         response = requests.get(
-            endpoint,
-            params={"content": "true"},
-            timeout=20,
+            REMOTIVE_API,
+            params={"limit": 500},
+            timeout=30,
         )
         response.raise_for_status()
         data = response.json()
 
+        return data.get("jobs", [])
+
     except (requests.RequestException, ValueError) as error:
-        print(f"Could not retrieve board {board_token}: {error}")
+        print(f"Could not retrieve Remotive jobs: {error}")
         return []
 
-    jobs = []
 
-    for item in data.get("jobs", []):
-        location = item.get("location") or {}
-        description = html.unescape(
-            item.get("content") or ""
-        )
+def matches_finance_role(job):
+    """Match finance-related job titles and descriptions."""
 
-        jobs.append({
-            "company": board_token,
-            "title": item.get("title", ""),
-            "location": location.get("name", ""),
-            "description": description,
-            "url": item.get("absolute_url", ""),
-            "updated_at": item.get("updated_at", ""),
-            "salary_lpa": None,
-        })
+    title = job.get("title", "").lower()
 
-    return jobs
+    # Avoid matching unrelated jobs just because finance is
+    # mentioned somewhere in a long description.
+    return any(keyword in title for keyword in KEYWORDS)
 
 
-def matches_preferences(job):
-    """Keep jobs matching the preferred finance roles and locations."""
+def accepts_candidate_location(job):
+    """Keep remote roles that accept candidates in India or worldwide."""
 
-    title = job["title"].lower()
-    location = job["location"].lower()
+    location = job.get(
+        "candidate_required_location", ""
+    ).lower()
 
-    relevant_role = any(
-        keyword in title for keyword in KEYWORDS
+    return (
+        "india" in location
+        or "worldwide" in location
+        or "anywhere" in location
+        or "all countries" in location
     )
-
-    relevant_location = any(
-        city.lower() in location for city in LOCATIONS
-    )
-
-    if not relevant_role or not relevant_location:
-        return False
-
-    # Do not invent salary figures when the posting omits them.
-    salary = job["salary_lpa"]
-
-    if salary is not None and salary < MIN_SALARY_LPA:
-        return False
-
-    return True
 
 
 def save_jobs(jobs):
-    """Save matching vacancies to a CSV file."""
+    """Save vacancies to a CSV file."""
 
     fields = [
         "company",
         "title",
         "location",
-        "salary_lpa",
+        "salary",
+        "job_type",
+        "published",
+        "source",
         "url",
-        "updated_at",
     ]
 
     with open(
@@ -118,63 +95,63 @@ def save_jobs(jobs):
         writer = csv.DictWriter(
             file,
             fieldnames=fields,
-            extrasaction="ignore",
         )
         writer.writeheader()
         writer.writerows(jobs)
 
 
 def find_jobs():
-    all_jobs = []
+    """Fetch, filter and save matching remote finance vacancies."""
 
-    for board in GREENHOUSE_BOARDS:
-        all_jobs.extend(fetch_greenhouse_jobs(board))
+    raw_jobs = fetch_remote_jobs()
+    results = {}
+    today = datetime.now(timezone.utc)
 
-    # Remove duplicate listings by application URL.
-    unique_jobs = {}
-    for job in all_jobs:
-        if job["url"]:
-            unique_jobs[job["url"]] = job
+    print(f"Retrieved {len(raw_jobs)} remote listings.")
 
-    matching_jobs = [
-        job for job in unique_jobs.values()
-        if matches_preferences(job)
-    ]
+    for job in raw_jobs:
+        if not matches_finance_role(job):
+            continue
 
-    matching_jobs.sort(
-        key=lambda job: (
-            job["salary_lpa"] is not None,
-            job["updated_at"],
-        ),
-        reverse=True,
-    )
+        if not accepts_candidate_location(job):
+            continue
 
-    save_jobs(matching_jobs)
+        url = job.get("url", "")
 
-    return matching_jobs
+        if not url:
+            continue
+
+        results[url] = {
+            "company": job.get("company_name", "Unknown"),
+            "title": job.get("title", ""),
+            "location": job.get(
+                "candidate_required_location", "Not specified"
+            ),
+            "salary": job.get("salary", "") or "Not disclosed",
+            "job_type": job.get("job_type", "Not specified"),
+            "published": job.get("publication_date", ""),
+            "source": "Remotive",
+            "url": url,
+        }
+
+    jobs = list(results.values())
+
+    save_jobs(jobs)
+
+    print(f"Matching remote finance jobs: {len(jobs)}")
+    print(f"Results saved to {OUTPUT_FILE}")
+    print("Source: Remotive")
+
+    for job in jobs[:15]:
+        print("-" * 45)
+        print(f"Company: {job['company']}")
+        print(f"Role: {job['title']}")
+        print(f"Eligible location: {job['location']}")
+        print(f"Salary: {job['salary']}")
+        print(f"Apply: {job['url']}")
+        print("Source: Remotive")
 
 
 if __name__ == "__main__":
     print("CareerPilot AI — Live Job Search")
-    print("Started:", datetime.now(timezone.utc).isoformat())
-
-    if not GREENHOUSE_BOARDS:
-        print(
-            "\nNo verified job boards configured yet."
-            "\nAdd employer board identifiers to "
-            "GREENHOUSE_BOARDS before searching."
-        )
-    else:
-        jobs = find_jobs()
-
-        print(f"\nMatching vacancies: {len(jobs)}\n")
-
-        for job in jobs:
-            print(f"Company/board: {job['company']}")
-            print(f"Role: {job['title']}")
-            print(f"Location: {job['location']}")
-            print(f"Salary: Not disclosed")
-            print(f"Application: {job['url']}")
-            print("-" * 45)
-
-        print(f"\nResults saved to {OUTPUT_FILE}")
+    find_jobs()
