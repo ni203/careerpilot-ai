@@ -24,7 +24,19 @@ MIN_SALARY_LPA = 4.0
 
 # Add verified Greenhouse board identifiers here.
 # These are identifiers, not company names.
-GREENHOUSE_BOARDS = []
+GREENHOUSE_BOARDS = [
+    "stripe",
+    "razorpay",
+    "phonepe",
+    "kpmg",
+    "American express",
+    "paytm",
+    "pwc",
+    "accenture",
+    "cognizant",
+    "marsh",
+    "ey",
+]
 
 OUTPUT_FILE = "jobs_found.csv"
 
